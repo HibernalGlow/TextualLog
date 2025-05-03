@@ -5,6 +5,9 @@ import time
 import threading
 from datetime import datetime
 
+# 直接从textual_logger导入set_layout，不需要通过TextualLoggerManager调用
+from textual_logger import set_layout
+
 # 设置日志文件路径
 LOG_FILE = os.path.join(os.path.dirname(__file__), "demo_file_logger.log")
 def write_demo_logs():
@@ -121,14 +124,12 @@ def write_demo_logs():
         file_handler.close()
 
 if __name__ == "__main__":
-    from textual_logger import TextualLoggerManager
-    
     # 确保日志文件存在
     if os.path.exists(LOG_FILE):
         os.remove(LOG_FILE)
     
     # 设置布局并指定日志文件
-    TextualLoggerManager.set_layout({
+    set_layout({
         "system": {"title": "🖥️ 系统状态", "style": "lightgreen", "ratio": 2},
         "error": {"title": "❌ 错误检查", "style": "lightpink", "ratio": 2},
         "info": {"title": "ℹ️ 信息日志", "style": "lightblue", "ratio": 3},
@@ -144,4 +145,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        pass 
+        pass
