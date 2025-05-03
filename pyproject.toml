@@ -12,6 +12,20 @@ dependencies = [
     "psutil>=5.9.0",
     "python-dotenv>=1.0.0",
 ]
+# 添加项目 URL 和许可证信息
+urls = {Homepage = "https://github.com/HibernalGlow/TextualLog", Documentation = "https://github.com/HibernalGlow/TextualLog#readme"}
+license = {text = "MIT"}
+# 添加项目分类，便于在 PyPI 上更好地分类
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+]
 
 
 [build-system]
@@ -21,6 +35,7 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 textual_logger = "textual_logger:main"  # 添加全局命令入口点
 tlog = "textual_logger:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}  # 告诉 setuptools 包位于 src 目录
 packages = ["textual_logger"]  # 添加主包 textual_logger
