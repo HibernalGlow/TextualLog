@@ -239,6 +239,8 @@ class TextualLogHandler(logging.Handler):
         self.log_file = log_file
         self.last_position = 0
         self._file_check_timer = None
+        # 面板标识符正则表达式
+        self.panel_tag_regex = re.compile(r'(\[[@#](\w{2,})\])')
 
     def _check_log_file(self):
         """检查日志文件更新"""
@@ -253,26 +255,8 @@ class TextualLogHandler(logging.Handler):
                     for line in new_lines:
                         line = line.strip()
                         if line:
-                            # 查找第一个面板标识符 [# 或 [@
-                            start_idx = -1
-                            for i in range(len(line)):
-                                if line[i:i+2] in ['[#', '[@']:
-                                    start_idx = i
-                                    break
-                            
-                            if start_idx >= 0:
-                                # 找到面板标识符的结束位置 ]
-                                end_idx = line.find(']', start_idx)
-                                if end_idx > start_idx:
-                                    # 提取消息内容（去掉面板标识符）
-                                    msg = line[end_idx + 1:].strip()
-                                else:
-                                    msg = line
-                            else:
-                                msg = line
-                                
                             self.emit(logging.makeLogRecord({
-                                'msg': msg,
+                                'msg': line,
                                 'levelno': logging.INFO,
                                 'created': time.time()
                             }))
@@ -363,132 +347,32 @@ class TextualLogHandler(logging.Handler):
         try:
             msg = self.format(record)
             
-            # 检查是否包含面板标识符
-            if not (msg.startswith('[#') or msg.startswith('[@')):
+            # 直接从消息中查找面板标识符
+            panel_match = self.panel_tag_regex.search(msg)
+            if not panel_match:
                 return  # 如果没有面板标识符，直接返回不处理
             
-            # 检查是否是真正的进度条（同时包含@和%）
-            is_real_progress = '@' in msg and '%' in msg
+            tag = panel_match.group(1)  # 完整标签，如[#panel]或[@panel]
+            panel_name = panel_match.group(2)  # 面板名称，如panel
             
-            # 提取面板标签
-            progress_match = re.match(r'^\[@(\w{2,})\](.*)$', msg)
-            normal_match = re.match(r'^\[#(\w{2,})\](.*)$', msg)
+            # 获取标签后的内容
+            content_start = panel_match.end()
+            content = msg[content_start:].strip()
             
-            # 获取标签和内容
-            panel_name = None
-            content = msg
-            tag = ""
-            
-            if progress_match:
-                panel_name = progress_match.group(1)
-                content = progress_match.group(2).strip()
-                tag = f"[@{panel_name}]"
-            elif normal_match:
-                panel_name = normal_match.group(1)
-                content = normal_match.group(2).strip()
-                tag = f"[#{panel_name}]"
-            else:
-                return  # 如果无法匹配面板标识符，直接返回不处理
-            
-            # 只在启用截断时进行处理
-            if self.enable_truncate:
-                # 获取终端宽度
-                try:
-                    terminal_width = self.app.console.width if self.app and self.app.console else 80
-                except:
-                    terminal_width = 80
-                    
-                # 调整最大消息长度为终端宽度
-                self.max_msg_length = max(terminal_width - 2, 40)  # 预留2个字符的边距
-                
-                # 处理消息截断
-                if len(content) > self.max_msg_length - len(tag):
-                    # 查找所有需要截断的路径
-                    matches = list(self.path_regex.finditer(content))
-                    if not matches:
-                        # 如果没有找到文件名或路径，保留开头和结尾的重要信息
-                        available_length = self.max_msg_length - len(tag) - 5  # 5是...和空格的长度
-                        if available_length > 20:  # 确保有足够空间显示
-                            # 分配60%给前部分，40%给后部分
-                            front_length = int(available_length * 0.6)
-                            back_length = available_length - front_length
-                            content = f"{content[:front_length]}...{content[-back_length:]}"
-                        else:
-                            # 空间不足时只显示开头部分
-                            content = f"{content[:self.max_msg_length-len(tag)-3]}..."
-                    else:
-                        truncated_content = content
-                        offset = 0
-                        
-                        # 处理所有匹配项
-                        for match in matches:
-                            start = match.start() - offset
-                            end = match.end() - offset
-                            original = match.group()
-                            
-                            # 计算当前位置的可用长度
-                            remaining_space = self.max_msg_length - len(tag)
-                            if remaining_space < 10:  # 空间不足
-                                remaining_space = self.max_msg_length  # 忽略标签长度以确保显示内容
-                                
-                            # 为文件名保留合理空间
-                            file_space = min(remaining_space // 2, self.max_filename_length)
-                            truncated = self._truncate_path(original, file_space)
-                            
-                            # 确保截断后的内容不会完全消失
-                            if not truncated or len(truncated) < 5:  # 如果截断后太短
-                                truncated = f"...{original[-10:]}"  # 至少保留最后10个字符
-                                
-                            if truncated != original:
-                                truncated_content = truncated_content[:start] + truncated + truncated_content[end:]
-                                offset += len(original) - len(truncated)
-                        
-                        content = truncated_content
-                        
-                        # 如果内容仍然太长，保留重要信息
-                        if len(content) > self.max_msg_length - len(tag):
-                            # 查找最后的数字信息（如：89.5）
-                            number_match = re.search(r'(\d+\.?\d*%?|\(\d+/\d+\))[^\d]*$', content)
-                            if number_match:
-                                # 保留开头部分和结尾的数字信息
-                                end_part = content[number_match.start():]
-                                available_length = self.max_msg_length - len(tag) - len(end_part) - 3
-                                if available_length > 10:
-                                    content = f"{content[:available_length]}...{end_part}"
-                                else:
-                                    # 空间实在不足时
-                                    content = f"{content[:self.max_msg_length-len(tag)-10]}...{end_part[-7:]}"
-                            else:
-                                # 如果没有数字信息，保留开头部分
-                                content = f"{content[:self.max_msg_length-len(tag)-3]}..."
-            
-            # 重新组合消息
-            final_msg = f"{tag}{content}" if tag else content
+            # 判断是否为进度条（@开头的标签）
+            is_progress = tag.startswith('[@')
             
             # 根据消息类型更新面板
-            if progress_match and is_real_progress:
+            if is_progress and '@' in msg and '%' in msg:
                 # 真正的进度条
                 self.app.update_panel(panel_name, content)
-            elif progress_match and not is_real_progress:
-                # 错误使用@的面板，转为普通面板处理
-                if record.levelno >= logging.ERROR:
-                    content = f"❌ {content}"
-                elif record.levelno >= logging.WARNING:
-                    content = f"⚠️ {content}"
-                self.app.update_panel(panel_name, content)
-            elif normal_match:
-                if record.levelno >= logging.ERROR:
-                    content = f"❌ {content}"
-                elif record.levelno >= logging.WARNING:
-                    content = f"⚠️ {content}"
-                self.app.update_panel(panel_name, content)
             else:
+                # 普通消息
                 if record.levelno >= logging.ERROR:
-                    self.app.update_panel("update", f"❌ {final_msg}")
+                    content = f"❌ {content}"
                 elif record.levelno >= logging.WARNING:
-                    self.app.update_panel("update", f"⚠️ {final_msg}")
-                else:
-                    self.app.update_panel("update", final_msg)
+                    content = f"⚠️ {content}"
+                self.app.update_panel(panel_name, content)
                 
         except Exception as e:
             self.handleError(record)
