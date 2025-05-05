@@ -147,8 +147,11 @@ class TextualLoggerManager:
                     # 获取当前脚本路径
                     current_script = os.path.abspath(__file__)
                     
-                    # 构建命令行
-                    cmd = f'wt new-tab -p "Windows PowerShell" {os.getenv("PYTHON_PATH")} "{current_script}" --config "{config_file}" --log-file "{log_file}"'
+                    # 获取当前 Python 解释器路径
+                    python_executable = sys.executable
+                    
+                    # 构建命令行 (使用 sys.executable)
+                    cmd = f'wt new-tab -p "Windows PowerShell" "{python_executable}" "{current_script}" --config "{config_file}" --log-file "{log_file}"'
                     
                     # 执行命令
                     import subprocess
