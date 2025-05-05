@@ -33,9 +33,25 @@ requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-textual_logger = "textual_logger:main"  # 添加全局命令入口点
-tlog = "textual_logger:main"
+textual_logger = "textual_logger.__main__:main"  # 更新为使用__main__模块的main函数
+tlog = "textual_logger.__main__:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}  # 告诉 setuptools 包位于 src 目录
-packages = ["textual_logger"]  # 添加主包 textual_logger
+package-dir = {"" = "src"}
+packages = ["textual_logger"]
+
+[tool.setuptools.package-data]
+"textual_logger" = ["py.typed"]  # 添加类型提示支持
+
+# 添加mypy配置，启用类型检查
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# 测试相关配置
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
