@@ -9,9 +9,9 @@ import json
 import asyncio
 import time
 
-# 导入管理器
-from .manager import TextualLoggerManager
-from .app import TextualLogger
+# 将相对导入改为绝对导入
+from textual_logger.manager import TextualLoggerManager
+from textual_logger.app import TextualLogger
 
 def main():
     """命令行入口函数，用于监控日志文件或启动演示模式"""
